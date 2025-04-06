@@ -1,7 +1,7 @@
 # Taiwanese Word Translator Web Extension 台灣用語翻譯工具
 
 This web extension converts text on web pages into Taiwanese words.
-這個網頁擴充工具能將網頁上的文字轉換為台灣用語。中文版 README 請參考[下方章節](#台灣用語翻譯工具-taiwanese-word-translator-web-extension)
+這個網頁擴充工具能將網頁上的文字轉換為台灣用語。中文版 README 請參考[下方章節](#台灣用語翻譯工具)。
 
 ## Current Version
 
@@ -15,10 +15,11 @@ The latest version of the "Taiwanese Word Translator" available on the Chrome We
 
 ## Terms
 
-1. This tool utilizes "[繁化姬](https://docs.zhconvert.org/)" for traditional and simplified character conversion. It does not guarantee that all word conversions are correct. Users can contribute to expanding the vocabulary in the project if needed.
-2. This tool does not consider context when determining word meanings. It does not convert terms that share the same word across Taiwanese and other countries in different contexts. For example, it does not convert “質量” to “品質” or “水平” to “水準.”
-3. Due to variations in webpage structures, the tool may not correctly render non-Taiwanese words.
-4. Please provide feedback or contributions to address any incomplete aspects of the tool.
+1. This open-source project is licensed under the terms of the [MIT license](https://choosealicense.com/licenses/mit/).
+2. This tool utilizes "[繁化姬](https://docs.zhconvert.org/)" for traditional and simplified character conversion. It does not guarantee that all word conversions are correct. Users can contribute to expanding the vocabulary in the project if needed.
+3. This tool does not consider context when determining word meanings. It does not convert terms that share the same word across Taiwanese and other countries in different contexts. For example, it does not convert “質量” to “品質” or “水平” to “水準.”
+4. Due to variations in webpage structures, the tool may not correctly render non-Taiwanese words.
+5. Please provide feedback or contributions to address any incomplete aspects of the tool.
 
 ## Privacy Policy
 
@@ -44,10 +45,11 @@ Chrome Web Store 上「台灣用語翻譯工具」的最新版本為 `1.0` 版�
 
 ## 服務條款
 
-1. 此工具引用「[繁化姬](https://docs.zhconvert.org/)」的繁簡轉化，不保證所有詞語轉換皆為正確；若有擴充詞語庫的需求，歡迎貢獻至該專案。
-2. 此工具目前不會依據前後文判斷詞意，若台灣及其他國家在不同語境下共用相同的詞語，此工具不會轉換詞語。例如：質量 → 品質、水平 → 水準。
-3. 此工具可能因網頁結構的差異，無法正確渲染非台灣的詞語。
-4. 工具未盡完整之處，歡迎於本專案提供想法或提出貢獻。
+1. 此開源專案使用 [MIT 授權條款](https://choosealicense.com/licenses/mit/)。
+2. 此工具引用「[繁化姬](https://docs.zhconvert.org/)」的繁簡轉化，不保證所有詞語轉換皆為正確；若有擴充詞語庫的需求，歡迎貢獻至該專案。
+3. 此工具目前不會依據前後文判斷詞意，若台灣及其他國家在不同語境下共用相同的詞語，此工具不會轉換詞語。例如：質量 → 品質、水平 → 水準。
+4. 此工具可能因網頁結構的差異，無法正確渲染非台灣的詞語。
+5. 工具未盡完整之處，歡迎於本專案提供想法或提出貢獻。
 
 ## 隱私權政策
 
