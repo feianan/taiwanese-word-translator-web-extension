@@ -1,0 +1,28 @@
+.tw-highlight {
+  background-color: darkred; /* 鵝黃色 */
+  color: white; /* 白色 */
+  cursor: help;
+  position: relative;
+  display: inline;
+  z-index: 9999;
+}
+
+.tw-highlight:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px;
+  background-color: #333;
+  color: white;
+  border-radius: 4px;
+  font-size: 14px;
+  white-space: nowrap;
+  z-index: 10000;
+  max-width: calc(100vw - 40px);
+  word-wrap: break-word;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+} 
