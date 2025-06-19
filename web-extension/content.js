@@ -1,20 +1,52 @@
+const IGNORE_STRINGS = [
+  '__next_f',
+  '$undefined',
+  'children',
+  'className',
+  'target',
+  'href',
+  'rel',
+  'stroke',
+  'fill',
+  'viewBox',
+  'xmlns',
+  'd=',
+  'width=',
+  'height=',
+  'style=',
+  'fillRule=',
+  'openQrModal'
+];
+const CHINESE_REGEX = /[\u4e00-\u9fa5]/;
+const WORD_SPLIT_REGEX = /([，。！？、：；「」『』（）\s])/g;
+const HIGHLIGHT_CLASS = 'tw-highlight';
+const TEXT_SEPARATOR = '\u0001';
+const ACTION_TOGGLE_ENABLED = 'toggleEnabled';
+const ACTION_CONVERT_TEXT = 'convertText';
+
 let isEnabled = false;
 let observer = null;
+let isProcessing = false;
+let processTimeout = null;
+let lastAllText = null;
+let extensionInvalid = false;
 
-// 初始化時檢查狀態
+// ===== 初始化：讀取狀態並啟動功能 =====
 chrome.storage.local.get(['isEnabled'], function(result) {
   isEnabled = result.isEnabled || false;
   if (isEnabled) {
     startObserving();
+    processPage();
   }
 });
 
-// 監聽來自 popup 的訊息
+// ===== popup 監聽階段 =====
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.action === 'toggleEnabled') {
+  if (request.action === ACTION_TOGGLE_ENABLED) {
     isEnabled = request.isEnabled;
     if (isEnabled) {
       startObserving();
+      processPage();
     } else {
       stopObserving();
       removeHighlights();
@@ -22,52 +54,63 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 });
 
-// 開始監聽 DOM 變化
+// ===== DOM 監聽與處理階段 =====
 function startObserving() {
   if (observer) {
     observer.disconnect();
   }
-  
-  // 處理當前頁面的內容
-  processPage();
-  
-  // 設置 MutationObserver
+  isProcessing = false;
+  extensionInvalid = false;
   observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-      if (mutation.addedNodes.length) {
-        processPage();
-      }
-    });
+    if (mutations.some(mutation => mutation.addedNodes.length > 0)) {
+      debouncedProcessPage();
+    }
   });
-  
-  // 開始觀察整個文檔的變化
   observer.observe(document.body, {
     childList: true,
     subtree: true
   });
 }
 
-// 停止監聽 DOM 變化
 function stopObserving() {
   if (observer) {
     observer.disconnect();
     observer = null;
   }
+  isProcessing = false;
+  lastAllText = null;
 }
 
-// 處理頁面內容
+// ===== API 溝通階段 =====
 function processPage() {
-  // 移除現有的標記
+  if (shouldSkipProcessing()) return;
+
+  prepareForProcessing();
+
+  const { textNodes, allText } = collectChineseTextNodes();
+  if (isSameAsLast(allText)) return finishProcessing();
+
+  lastAllText = allText;
+  sendConvertRequest(allText, textNodes, finishProcessing, handleExtensionInvalid);
+}
+
+function shouldSkipProcessing() {
+  return isProcessing || extensionInvalid;
+}
+
+function prepareForProcessing() {
+  isProcessing = true;
+  if (observer) observer.disconnect();
   removeHighlights();
-  
-  // 取得所有文字節點
+}
+
+function collectChineseTextNodes() {
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: function(node) {
-        // 檢查節點是否包含中文字
-        if (containsChinese(node.nodeValue)) {
+        if (isChineseText(node.nodeValue)) {
           return NodeFilter.FILTER_ACCEPT;
         }
         return NodeFilter.FILTER_REJECT;
@@ -75,136 +118,122 @@ function processPage() {
     },
     false
   );
-
-  let node;
-  let textNodes = [];
+  const textNodes = [];
   let allText = '';
-  
-  // 收集所有文字節點和文字
-  while (node = walker.nextNode()) {
-    // 檢查節點是否包含中文字
-    if (containsChinese(node.nodeValue)) {
-      // 檢查節點是否為純中文字
-      if (isPureChinese(node.nodeValue)) {
-        textNodes.push(node);
-        allText += node.nodeValue + '\u0001'; // 使用 \u0001 作為分隔符
+  while (true) {
+    const node = walker.nextNode();
+    if (!node) break;
+    if (!isChineseText(node.nodeValue)) continue;
+    textNodes.push(node);
+    allText += node.nodeValue + TEXT_SEPARATOR;
+  }
+  return { textNodes, allText };
+}
+
+function isSameAsLast(allText) {
+  return allText === lastAllText;
+}
+
+function finishProcessing() {
+  startObserving();
+  isProcessing = false;
+}
+
+function sendConvertRequest(allText, textNodes, onFinish, onError) {
+  try {
+    chrome.runtime.sendMessage({
+      action: ACTION_CONVERT_TEXT,
+      text: allText
+    }, function(response) {
+      if (chrome.runtime.lastError) {
+        onError();
+        return;
       }
-    }
+      if (response && response.converted) {
+        highlightDifferences(allText, response.converted, textNodes);
+      }
+      onFinish();
+    });
+  } catch (e) {
+    onFinish();
   }
-  
-  // 發送到 background script 進行轉換
-  chrome.runtime.sendMessage({
-    action: 'convertText',
-    text: allText
-  }, function(response) {
-    if (response && response.converted) {
-      highlightDifferences(allText, response.converted, textNodes);
-    }
-  });
 }
 
-// 檢查字串是否包含中文字
-function containsChinese(str) {
-  return /[\u4e00-\u9fa5]/.test(str);
+function handleExtensionInvalid() {
+  if (!extensionInvalid) {
+    extensionInvalid = true;
+    stopObserving();
+    console.info('Extension context invalidated, skip processPage. Error:', chrome.runtime.lastError?.message);
+  }
+  isProcessing = false;
 }
 
-// 檢查字串是否為純中文字
-function isPureChinese(str) {
-  // 移除空白字符
-  str = str.trim();
-  
-  // 如果字串為空，則不為純中文字
-  if (str.length === 0) {
-    return false;
-  }
-  
-  // 檢查字串是否包含 React/Next.js 的內部代碼
-  if (
-    str.includes('__next_f') || 
-    str.includes('$undefined') || 
-    str.includes('children') || 
-    str.includes('className') || 
-    str.includes('target') || 
-    str.includes('href') || 
-    str.includes('rel') || 
-    str.includes('stroke') || 
-    str.includes('fill') || 
-    str.includes('viewBox') || 
-    str.includes('xmlns') ||
-    str.includes('d=') ||
-    str.includes('width=') ||
-    str.includes('height=') ||
-    str.includes('style=') ||
-    str.includes('fillRule=') ||
-    str.includes('openQrModal')
-  ) {
-    return false;
-  }
-  
-  // 檢查字串是否包含中文字
-  return /[\u4e00-\u9fa5]/.test(str);
-}
-
-// 標記差異
+// ===== 比對與標記階段 =====
 function highlightDifferences(original, converted, nodes) {
-  const originalLines = original.split('\u0001');
-  const convertedLines = converted.split('\u0001');
-  
-  let nodeIndex = 0;
-  
+  const originalLines = original.split(TEXT_SEPARATOR);
+  const convertedLines = converted.split(TEXT_SEPARATOR);
+
   for (let i = 0; i < originalLines.length; i++) {
-    if (originalLines[i] !== convertedLines[i]) {
-      // 找出具體的差異詞
-      const diffWords = findDiffWords(originalLines[i], convertedLines[i]);
-      
-      // 找到對應的節點
-      const node = nodes[nodeIndex];
-      if (node) {
-        // 創建一個 span 元素來包裹原始文字
-        const span = document.createElement('span');
-        
-        // 只標記差異詞
-        let nodeText = node.nodeValue;
-        for (const diffWord of diffWords) {
-          const [originalWord, convertedWord] = diffWord.split(' → ');
-          // 使用正則表達式來確保只替換完整的詞，並轉義特殊字符
-          const escapedWord = originalWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp(escapedWord, 'g');
-          nodeText = nodeText.replace(regex, `<span class="tw-highlight" title="${convertedWord}">${originalWord}</span>`);
-        }
-        
-        span.innerHTML = nodeText;
-        node.parentNode.replaceChild(span, node);
-      }
-    }
-    nodeIndex++;
+    if (originalLines[i] === convertedLines[i]) continue;
+    const node = nodes[i];
+    if (!node) continue;
+
+    const diffWords = findDiffWords(originalLines[i], convertedLines[i]);
+    const span = createHighlightedSpan(node.nodeValue, diffWords);
+    node.parentNode.replaceChild(span, node);
   }
 }
 
-// 找出兩個字串中的差異詞
+function createHighlightedSpan(text, diffWords) {
+  let nodeText = text;
+  for (const diffWord of diffWords) {
+    const [originalWord, convertedWord] = diffWord.split(' → ');
+    const escapedWord = originalWord.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedWord, 'g');
+    nodeText = nodeText.replace(
+      regex,
+      `<span class="${HIGHLIGHT_CLASS}" title="${convertedWord}">${originalWord}</span>`
+    );
+  }
+  const span = document.createElement('span');
+  span.innerHTML = nodeText;
+  return span;
+}
+
+// ===== 輔助功能 =====
 function findDiffWords(original, converted) {
-  // 將字串分割成詞，使用更精確的分割方式
-  const originalWords = original.split(/([，。！？、：；「」『』（）\s])/g).filter(word => word.trim());
-  const convertedWords = converted.split(/([，。！？、：；「」『』（）\s])/g).filter(word => word.trim());
-  
+  const originalWords = original.split(WORD_SPLIT_REGEX).filter(word => word.trim());
+  const convertedWords = converted.split(WORD_SPLIT_REGEX).filter(word => word.trim());
   const diffWords = [];
-  
-  // 比較每個詞
   for (let i = 0; i < Math.min(originalWords.length, convertedWords.length); i++) {
     if (originalWords[i] !== convertedWords[i] && originalWords[i].length > 0) {
       diffWords.push(`${originalWords[i]} → ${convertedWords[i]}`);
     }
   }
-  
   return diffWords;
 }
 
-// 移除所有標記
+function isChineseText(str) {
+  str = str.trim();
+  if (str.length === 0) {
+    return false;
+  }
+  if (IGNORE_STRINGS.some(ignore => str.includes(ignore))) {
+    return false;
+  }
+  return CHINESE_REGEX.test(str);
+}
+
 function removeHighlights() {
-  const highlights = document.getElementsByClassName('tw-highlight');
+  const highlights = document.getElementsByClassName(HIGHLIGHT_CLASS);
   while (highlights.length > 0) {
     const highlight = highlights[0];
     const text = document.createTextNode(highlight.textContent);
     highlight.parentNode.replaceChild(text, highlight);
   }
+}
+
+function debouncedProcessPage() {
+  if (processTimeout) clearTimeout(processTimeout);
+  processTimeout = setTimeout(processPage, 200);
 } 

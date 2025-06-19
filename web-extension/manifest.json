@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "台灣用語翻譯工具",
-  "version": "1.0",
+  "version": "1.2",
   "description": "將網頁上的文字轉換為台灣用語。Turn text into Taiwanese words.",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting"
+    "activeTab"
   ],
   "host_permissions": [
     "https://api.zhconvert.org/*"
