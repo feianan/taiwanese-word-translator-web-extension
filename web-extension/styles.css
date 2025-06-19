@@ -1,10 +1,12 @@
 .tw-highlight {
-  background-color: darkred; /* 鵝黃色 */
-  color: white; /* 白色 */
+  background-color: darkgoldenrod;
+  color: white;
   cursor: help;
   position: relative;
   display: inline;
   z-index: 9999;
+  border-radius: 6px;
+  padding: 2px 4px;
 }
 
 .tw-highlight:hover::after {

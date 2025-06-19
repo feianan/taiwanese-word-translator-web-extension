@@ -35,7 +35,7 @@ This web extension operates locally on the user's computer. It does not upload w
 
 ## 目前版本
 
-Chrome Web Store 上「台灣用語翻譯工具」的最新版本為 `1.0` 版。
+Chrome Web Store 上「台灣用語翻譯工具」的最新版本為 `1.2` 版。
 
 ## 如何使用？
 
